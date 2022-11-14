@@ -57,7 +57,8 @@ class Worklist extends React.Component {
           key={key}
         >
           {item.AccessionNumber} / {item.StudyID} / {item.PatientID} /{" "}
-          {item.ModalitiesInStudy}
+          {item.ModalitiesInStudy} / &gt;&gt;&gt; Click to view in detail page
+          viewer
         </div>
       ) : null
     );
