@@ -77,15 +77,11 @@ function _createClientMapping({ baseUri, settings, onError }) {
   return clientMapping;
 }
 
+const { protocol, host } = window.location;
+const baseUri = `${protocol}//${host}`;
 const clients = _createClientMapping({
-  baseUri: "http://localhost:3001",
-  settings: [
-    {
-      id: "local",
-      url: "https://idc-external-006.uc.r.appspot.com/dcm4chee-arc/aets/DCM4CHEE/rs",
-      write: true,
-    },
-  ],
+  baseUri,
+  settings: window.config.servers,
 });
 
 const ParametrizedCaseViewer = ({
@@ -103,6 +99,8 @@ const ParametrizedCaseViewer = ({
 };
 
 function App({ match }) {
+  // const worker = new Worker();
+  // console.log(worker);
   return (
     <Switch>
       <Route
@@ -112,7 +110,21 @@ function App({ match }) {
       />
       <Route
         path={`${match.url}study/:studyInstanceUID/`}
-        render={() => <ParametrizedCaseViewer clients={clients} />}
+        render={() => (
+          <section className="ant-layout" style={{ height: "100vh" }}>
+            <div className="ant-layout-content" style={{ height: "100%" }}>
+              <div
+                style={{
+                  height: "calc(100% - 0px)",
+                  overflow: "hidden",
+                  cursor: "default",
+                }}
+              >
+                <ParametrizedCaseViewer clients={clients} />
+              </div>
+            </div>
+          </section>
+        )}
       />
     </Switch>
   );

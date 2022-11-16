@@ -84,6 +84,10 @@ export default class DicomWebManager {
     options,
   ) => this.stores[0].client.searchForStudies(options)
 
+  retrieveInstanceFrames = async (options) => 
+    await this.stores[0].client.retrieveInstanceFrames(options)
+  
+
   searchForSeries = async (
     options,
   ) => this.stores[0].client.searchForSeries(options)

@@ -16,6 +16,7 @@
   },
   "scripts": {
     "start": "react-app-rewired start",
+    "start-craco": "rm -rf ./node_modules/.cache/default-development && craco start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
@@ -39,6 +40,8 @@
     ]
   },
   "devDependencies": {
+    "@craco/craco": "^7.0.0",
+    "copy-webpack-plugin": "^11.0.0",
     "react-app-rewired": "^2.2.1"
   }
 }
