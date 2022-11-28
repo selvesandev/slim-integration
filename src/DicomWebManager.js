@@ -67,7 +67,11 @@ export default class DicomWebManager {
         id: serverSettings.id,
         write: serverSettings.write ?? false,
         read: serverSettings.read ?? true,
-        client: new dwc.api.DICOMwebClient(clientSettings),
+        client: new dwc.api.DICOMwebClient({...clientSettings
+          ,headers: {
+          Authorization: 'Basic b3J0aGFuYzpvcnRoYW5j'
+        }
+      }),
       });
     });
 
@@ -80,17 +84,44 @@ export default class DicomWebManager {
     return this.stores[0].client.baseURL;
   }
 
+  updateHeaders = (fields) => {
+    for (const f in fields) {
+      this.stores[0].client.headers[f] = fields[f]
+    }
+  }
+
+  get headers () {
+    return this.stores[0].client.headers
+  }
+
+  storeInstances = async (
+    options
+  ) => {
+    if (this.stores[0].write) {
+      return await this.stores[0].client.storeInstances(options)
+    } else {
+      return await Promise.reject(
+        new Error('Store is not writable.')
+      )
+    }
+  }
+
+
   searchForStudies = async (
     options,
   ) => this.stores[0].client.searchForStudies(options)
 
-  retrieveInstanceFrames = async (options) => 
-    await this.stores[0].client.retrieveInstanceFrames(options)
-  
 
   searchForSeries = async (
     options,
   ) => this.stores[0].client.searchForSeries(options)
+
+
+  searchForInstances = async (
+    options
+  ) => {
+    return await this.stores[0].client.searchForInstances(options)
+  }
 
   retrieveStudyMetadata = async (
     options,
@@ -100,18 +131,38 @@ export default class DicomWebManager {
     options,
   ) => this.stores[0].client.retrieveSeriesMetadata(options)
 
-  updateHeaders = (fields) => {
-    // eslint-disable-next-line no-restricted-syntax, guard-for-in
-    for (const f in fields) {
-      this.stores[0].client.headers[f] = fields[f];
-    }
+  retrieveInstanceMetadata = async (
+    options
+  ) => {
+    return await this.stores[0].client.retrieveInstanceMetadata(options)
   }
 
   retrieveInstance = async (
-    options,
-  ) => this.stores[0].client.retrieveInstance(options)
+    options
+  ) => {
+    return await this.stores[0].client.retrieveInstance(options)
+  }
 
-  searchForInstances = async (
-    options,
-  ) => this.stores[0].client.searchForInstances(options)
+  retrieveInstanceFrames = async (options) => 
+    await this.stores[0].client.retrieveInstanceFrames(options)
+  
+  retrieveInstanceRendered = async (
+    options
+  ) => {
+    return await this.stores[0].client.retrieveInstanceRendered(options)
+  }
+  
+  retrieveInstanceFramesRendered = async (
+    options
+  ) => {
+    return await this.stores[0].client.retrieveInstanceFramesRendered(options)
+  }
+
+
+  retrieveBulkData = async (
+    options
+  ) => {
+    return await this.stores[0].client.retrieveBulkData(options)
+  }
+
 }

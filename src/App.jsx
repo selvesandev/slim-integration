@@ -99,8 +99,6 @@ const ParametrizedCaseViewer = ({
 };
 
 function App({ match }) {
-  // const worker = new Worker();
-  // console.log(worker);
   return (
     <Switch>
       <Route

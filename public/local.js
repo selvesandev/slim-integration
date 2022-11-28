@@ -5,8 +5,11 @@ window.config = {
       {
         id: 'local',
         // This must match the proxy location configured for the web server
+        // url: 'http://localhost:8042',
+        url: 'http://localhost/dicom-web',
+        // url: 'http://pacs.moichor.us:8042/dicom-web/studies',
         // url: 'http://localhost:8008/dcm4chee-arc/aets/DCM4CHEE/rs',
-        url: 'https://idc-external-006.uc.r.appspot.com/dcm4chee-arc/aets/DCM4CHEE/rs',
+        // url: 'https://idc-external-006.uc.r.appspot.com/dcm4chee-arc/aets/DCM4CHEE/rs',
         // url: 'https://server.dcmjs.org/dcm4chee-arc/aets/DCM4CHEE/rs',
         write: true
       }

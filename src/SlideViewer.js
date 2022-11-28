@@ -67,10 +67,22 @@ constructor(props) {
     console.log('deactivateOpticalPath');
   });
 
+  const [offset, size] = this.volumeViewer.boundingBox
+
   this.state = {
     presentationStates: [],
     isLoading: false,
+    visibleRoiUIDs: new Set(),
+    visibleSegmentUIDs: new Set(),
+    visibleMappingUIDs: new Set(),
+    visibleAnnotationGroupUIDs: new Set(),
+    visibleOpticalPathIdentifiers: new Set(),
+    activeOpticalPathIdentifiers: new Set(),
+    loadingFrames: new Set(),
+    validXCoordinateRange: [offset[0], offset[0] + size[0]],
+    validYCoordinateRange: [offset[1], offset[1] + size[1]],
   };
+
 }
 
   loadPresentationStates = () => {
@@ -289,7 +301,63 @@ constructor(props) {
     );
   }
 
+
+  componentCleanup () {
+    // document.body.removeEventListener(
+    //   'dicommicroscopyviewer_roi_drawn',
+    //   this.onRoiDrawn
+    // )
+    // document.body.removeEventListener(
+    //   'dicommicroscopyviewer_roi_selected',
+    //   this.onRoiSelected
+    // )
+    // document.body.removeEventListener(
+    //   'dicommicroscopyviewer_roi_removed',
+    //   this.onRoiRemoved
+    // )
+    // document.body.removeEventListener(
+    //   'dicommicroscopyviewer_roi_modified',
+    //   this.onRoiModified
+    // )
+    // document.body.removeEventListener(
+    //   'dicommicroscopyviewer_loading_started',
+    //   this.onLoadingStarted
+    // )
+    // document.body.removeEventListener(
+    //   'dicommicroscopyviewer_loading_ended',
+    //   this.onLoadingEnded
+    // )
+    // document.body.removeEventListener(
+    //   'dicommicroscopyviewer_frame_loading_started',
+    //   this.onFrameLoadingStarted
+    // )
+    // document.body.removeEventListener(
+    //   'dicommicroscopyviewer_frame_loading_ended',
+    //   this.onFrameLoadingEnded
+    // )
+    // document.body.removeEventListener(
+    //   'keyup',
+    //   this.onKeyUp
+    // )
+    // window.removeEventListener('resize', this.onWindowResize)
+
+    // this.volumeViewer.cleanup()
+    // if (this.labelViewer != null) {
+    //   this.labelViewer.cleanup()
+    // }
+    /*
+     * FIXME: React appears to not clean the content of referenced
+     * HTMLDivElement objects when the page is reloaded. As a consequence,
+     * optical paths and other display items cannot be toggled or updated after
+     * a manual page reload. I have tried using ref callbacks and passing the
+     * ref objects from the parent component via the props. Both didn't work
+     * either.
+     */
+  }
+
+
   populateViewports = () => {
+
     console.info('populate viewports...');
 
     this.setState({
@@ -302,13 +370,105 @@ constructor(props) {
     if (this.volumeViewportRef.current != null) {
       this.volumeViewer.render({ container: this.volumeViewportRef.current });
     }
+    if (
+      this.labelViewportRef.current != null &&
+      this.labelViewer != null
+    ) {
+      this.labelViewer.render({ container: this.labelViewportRef.current })
+    }
     this.setState({ isLoading: false });
     this.loadPresentationStates();
+  }
+
+
+  componentDidUpdate (
+    previousProps,
+    previousState
+  ) {
+    console.log(previousState,previousProps,'previousProps,previousState');
+    console.log(this.props.location.pathname);
+    if (
+      this.props.location.pathname !== previousProps.location.pathname ||
+      this.props.studyInstanceUID !== previousProps.studyInstanceUID ||
+      this.props.seriesInstanceUID !== previousProps.seriesInstanceUID ||
+      this.props.slide !== previousProps.slide ||
+      this.props.clients !== previousProps.clients
+    ) {
+      if (this.volumeViewportRef.current != null) {
+        this.volumeViewportRef.current.innerHTML = ''
+      }
+      this.volumeViewer.cleanup()
+      if (this.labelViewer != null) {
+        if (this.labelViewportRef.current != null) {
+          this.labelViewportRef.current.innerHTML = ''
+        }
+        this.labelViewer.cleanup()
+      }
+      const { volumeViewer, labelViewer } = _constructViewers({
+        clients: this.props.clients,
+        slide: this.props.slide,
+        preload: this.props.preload
+      })
+      this.volumeViewer = volumeViewer
+      this.labelViewer = labelViewer
+
+      const activeOpticalPathIdentifiers = new Set()
+      const visibleOpticalPathIdentifiers = new Set()
+      console.log(this.volumeViewer.getAllOpticalPaths(),'getAllOpticalPaths()');
+      this.volumeViewer.getAllOpticalPaths().forEach(opticalPath => {
+        const identifier = opticalPath.identifier
+        if (this.volumeViewer.isOpticalPathVisible(identifier)) {
+          visibleOpticalPathIdentifiers.add(identifier)
+        }
+        if (this.volumeViewer.isOpticalPathActive(identifier)) {
+          activeOpticalPathIdentifiers.add(identifier)
+        }
+      })
+
+      const [offset, size] = this.volumeViewer.boundingBox
+      console.log(this.volumeViewer.boundingBox,'this.volumeViewer.boundingBox');
+      this.setState({
+        visibleRoiUIDs: new Set(),
+        visibleSegmentUIDs: new Set(),
+        visibleMappingUIDs: new Set(),
+        visibleAnnotationGroupUIDs: new Set(),
+        visibleOpticalPathIdentifiers,
+        activeOpticalPathIdentifiers,
+        presentationStates: [],
+        loadingFrames: new Set(),
+        validXCoordinateRange: [offset[0], offset[0] + size[0]],
+        validYCoordinateRange: [offset[1], offset[1] + size[1]]
+      })
+      this.populateViewports()
+    }
   }
 
   componentDidMount() {
     console.log('slideViewr componentDidMount');
     this.populateViewports();
+
+    if (!this.props.slide.areVolumeImagesMonochrome) {
+      console.log('this.props.slide.areVolumeImagesMonochrome');
+      let hasICCProfile = false
+      const image = this.props.slide.volumeImages[0]
+      const metadataItem = image.OpticalPathSequence[0]
+      if (metadataItem.ICCProfile == null) {
+        if ('OpticalPathSequence' in image.bulkdataReferences) {
+          // @ts-expect-error
+          const bulkdataItem = image.bulkdataReferences.OpticalPathSequence[0]
+          if ('ICCProfile' in bulkdataItem) {
+            hasICCProfile = true
+          }
+        }
+      } else {
+        hasICCProfile = true
+      }
+      if (!hasICCProfile) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        console.log('No ICC Profile was found for color images')
+      }
+    }
+  
   }
 
   render() {
