@@ -58,8 +58,8 @@ class Viewer extends React.Component {
   }
 
   componentDidMount() {
-    this.fetchImageMetadata().then(
-      (metadata) => {
+    this.fetchImageMetadata()
+    .then((metadata) => {
         console.log(metadata, 'fetchImageMetadata');
         const slides = createSlides(metadata);
         console.log('createSlides', slides);

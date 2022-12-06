@@ -93,7 +93,7 @@ class Slide {
       options.images.forEach((image) => {
         containerIdentifiers.add(image.ContainerIdentifier);
         seriesInstanceUIDs.add(image.SeriesInstanceUID);
-        image.OpticalPathSequence.forEach((item) => {
+        options.images[0].OpticalPathSequence.forEach((item) => {
           opticalPathIdentifiers.add(item.OpticalPathIdentifier);
         });
         if (image.AcquisitionUID != null) {

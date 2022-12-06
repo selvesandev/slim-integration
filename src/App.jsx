@@ -109,18 +109,18 @@ function App({ match }) {
       <Route
         path={`${match.url}study/:studyInstanceUID/`}
         render={() => (
-          <section className="ant-layout" style={{ height: "100vh" }}>
-            <div className="ant-layout-content" style={{ height: "100%" }}>
-              <div
+          <section style={{ height: "500px" }}>
+            {/* <div className="ant-layout-content" style={{ height: "100%" }}> */}
+            {/* <div
                 style={{
                   height: "calc(100% - 0px)",
                   overflow: "hidden",
                   cursor: "default",
                 }}
-              >
-                <ParametrizedCaseViewer clients={clients} />
-              </div>
-            </div>
+              > */}
+            <ParametrizedCaseViewer clients={clients} />
+            {/* </div> */}
+            {/* </div> */}
           </section>
         )}
       />

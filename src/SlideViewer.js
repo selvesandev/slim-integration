@@ -19,6 +19,7 @@ const _constructViewers = ({ clients, slide, preload }) => {
       preload,
     });
     volumeViewer.activateSelectInteraction({});
+    console.log(volumeViewer, "volumeViewerConsole");
 
     let labelViewer;
     console.log(slide.labelImages.length, 'slide.labelImages.length');
@@ -481,8 +482,8 @@ constructor(props) {
 
     console.log('render function slide viewer');
     return (
-      <section className="ant-layout ant-layout-has-sider" style={{ height: '100%' }}>
-        <main className="ant-layout-content" style={{ height: '100%' }}>
+      // <section style={{ height: '100%' }}>
+        <div style={{ height: '100%' }}>
           <div
             style={{
               height: `calc(100% - ${toolbarHeight})`,
@@ -491,8 +492,8 @@ constructor(props) {
             }}
             ref={this.volumeViewportRef}
           />
-        </main>
-      </section>
+        </div>
+      // </section>
     );
   }
 }
