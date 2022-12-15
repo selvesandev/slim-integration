@@ -62,14 +62,15 @@ export default class DicomWebManager {
       clientSettings.errorInterceptor = (error) => {
         this.handleError(error, serverSettings);
       };
-
+      const authorization = window.config.isLocal ? 'b3J0aGFuYzpvcnRoYW5j' : 'YWRtaW46aS0wZmQ0ZGNhN2UzNWY1ODEzNQ==';
+      
       this.stores.push({
         id: serverSettings.id,
         write: serverSettings.write ?? false,
         read: serverSettings.read ?? true,
         client: new dwc.api.DICOMwebClient({...clientSettings
           ,headers: {
-          Authorization: 'Basic b3J0aGFuYzpvcnRoYW5j'
+          Authorization: `Basic ${authorization}`
         }
       }),
       });
@@ -109,52 +110,76 @@ export default class DicomWebManager {
 
   searchForStudies = async (
     options,
-  ) => this.stores[0].client.searchForStudies(options)
+  ) => {
+    console.log('searchForStudies');
+    return await this.stores[0].client.searchForStudies(options)
+  }
 
 
   searchForSeries = async (
     options,
-  ) => this.stores[0].client.searchForSeries(options)
+  ) => {
+    console.log('searchForSeries');
+    return await this.stores[0].client.searchForSeries(options)
+  }
 
 
   searchForInstances = async (
     options
   ) => {
+    console.log('searchForInstances');
     return await this.stores[0].client.searchForInstances(options)
   }
 
   retrieveStudyMetadata = async (
     options,
-  ) => this.stores[0].client.retrieveStudyMetadata(options)
+  ) => {
+    console.log('retrieveStudyMetadata');
+    return await this.stores[0].client.retrieveStudyMetadata(options)
+  }
 
   retrieveSeriesMetadata = async (
     options,
-  ) => this.stores[0].client.retrieveSeriesMetadata(options)
+  ) => {
+    console.log('retrieveInstanceMetadata');
+
+    return await this.stores[0].client.retrieveSeriesMetadata(options)
+  }
 
   retrieveInstanceMetadata = async (
     options
   ) => {
+    console.log('retrieveInstanceMetadata');
+
     return await this.stores[0].client.retrieveInstanceMetadata(options)
   }
 
   retrieveInstance = async (
     options
   ) => {
+    console.log('retrieveInstance');
+
     return await this.stores[0].client.retrieveInstance(options)
   }
 
-  retrieveInstanceFrames = async (options) => 
-    await this.stores[0].client.retrieveInstanceFrames(options)
-  
+  retrieveInstanceFrames = async (options) => {
+    console.log('retrieveInstanceFrames');
+
+   return  await this.stores[0].client.retrieveInstanceFrames(options)
+
+  }
+    
   retrieveInstanceRendered = async (
     options
   ) => {
+    console.log('retrieveInstanceRendered');
     return await this.stores[0].client.retrieveInstanceRendered(options)
   }
   
   retrieveInstanceFramesRendered = async (
     options
   ) => {
+    console.log('retrieveInstanceFramesRendered');
     return await this.stores[0].client.retrieveInstanceFramesRendered(options)
   }
 
@@ -162,6 +187,7 @@ export default class DicomWebManager {
   retrieveBulkData = async (
     options
   ) => {
+    console.log('retrieveBulkData',options);
     return await this.stores[0].client.retrieveBulkData(options)
   }
 

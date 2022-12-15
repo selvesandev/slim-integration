@@ -3,6 +3,7 @@ import CaseViewer from "./CaseViewer";
 import { StorageClasses } from "./dicomService";
 import DicomWebManager from "./DicomWebManager";
 import WorkList from "./WorkList";
+import React from "react";
 
 // eslint-disable-next-line no-underscore-dangle
 function _createClientMapping({ baseUri, settings, onError }) {
@@ -88,17 +89,27 @@ const ParametrizedCaseViewer = ({
   clients,
   // user,
   // app,
-  // config,
+  config,
 }) => {
   const { studyInstanceUID } = useParams();
+  console.log("ParametrizedCaseViewer component");
   // const enableAnnotationTools = !(config.disableAnnotationTools ?? false)
   // const preload = config.preload ?? false
+  console.log(config, "config...");
   return (
-    <CaseViewer clients={clients} preload studyInstanceUID={studyInstanceUID} />
+    // <React.StrictMode>
+    <CaseViewer
+      annotations={config.annotations}
+      clients={clients}
+      preload
+      studyInstanceUID={studyInstanceUID}
+    />
+    // </React.StrictMode>
   );
 };
 
-function App({ match }) {
+function App({ match, config }) {
+  console.log(config, "config...");
   return (
     <Switch>
       <Route
@@ -118,7 +129,9 @@ function App({ match }) {
                   cursor: "default",
                 }}
               > */}
-            <ParametrizedCaseViewer clients={clients} />
+            {/* <React.StrictMode> */}
+            <ParametrizedCaseViewer config={config} clients={clients} />
+            {/* </React.StrictMode> */}
             {/* </div> */}
             {/* </div> */}
           </section>

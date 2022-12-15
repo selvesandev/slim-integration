@@ -1,8 +1,54 @@
 import React from 'react';
 
 import * as dmv from 'dicom-microscopy-viewer';
+import * as dcmjs from 'dcmjs'
+
 import { withRouter } from 'react-router-dom';
 import { StorageClasses } from './dicomService';
+
+const DEFAULT_ROI_STROKE_COLOR = [0, 126, 163]
+const DEFAULT_ROI_FILL_COLOR = [0, 126, 163, 0.2]
+const DEFAULT_ROI_STROKE_WIDTH = 2
+// const DEFAULT_ROI_RADIUS = 5
+
+
+
+const _formatRoiStyle = (style) => {
+  const stroke = {
+    color: DEFAULT_ROI_STROKE_COLOR,
+    width: DEFAULT_ROI_STROKE_WIDTH
+  }
+  if (style.stroke != null) {
+    if (style.stroke.color != null) {
+      stroke.color = style.stroke.color
+    }
+    if (style.stroke.width != null) {
+      stroke.width = style.stroke.width
+    }
+  }
+  const fill = {
+    color: DEFAULT_ROI_FILL_COLOR
+  }
+  if (style.fill != null) {
+    if (style.fill.color != null) {
+      fill.color = style.fill.color
+    }
+  }
+  return {
+    stroke,
+    fill,
+    image: {
+      circle: {
+        radius: style.radius != null
+          ? style.radius
+          : Math.max(5 - stroke.width, 1),
+        stroke,
+        fill
+      }
+    }
+  }
+}
+
 const _constructViewers = ({ clients, slide, preload }) => {
   console.info(
     'instantiate viewer for VOLUME images of slide '
@@ -18,6 +64,7 @@ const _constructViewers = ({ clients, slide, preload }) => {
       controls: ['overview', 'position'],
       preload,
     });
+
     volumeViewer.activateSelectInteraction({});
     console.log(volumeViewer, "volumeViewerConsole");
 
@@ -28,6 +75,7 @@ const _constructViewers = ({ clients, slide, preload }) => {
         'instantiate viewer for LABEL image of slide '
         + `"${slide.labelImages[0].ContainerIdentifier}" THERE`,
       );
+
       labelViewer = new dmv.viewer.LabelImageViewer({
         client: clients[StorageClasses.VL_WHOLE_SLIDE_MICROSCOPY_IMAGE],
         metadata: slide.labelImages[0],
@@ -35,6 +83,7 @@ const _constructViewers = ({ clients, slide, preload }) => {
         orientation: 'vertical',
       });
     }
+    
     return { volumeViewer, labelViewer };
   } catch (error) {
     console.error('Failed to instantiate viewer');
@@ -42,12 +91,75 @@ const _constructViewers = ({ clients, slide, preload }) => {
   }
 };
 
+const _buildKey = (concept) => {
+  const codingScheme = concept.CodingSchemeDesignator
+  const codeValue = concept.CodeValue
+  return `${codingScheme}-${codeValue}`
+}
+
 class SlideViewer extends React.Component {
-selectionColor = [140, 184, 198]
+selectionColor = [140, 184, 198];
+findingOptions = [];
+geometryTypeOptions = {};
+// geometryTypeOptions = {}
+evaluationOptions = {};
+measurements = []
+roiStyles = {}
 
 constructor(props) {
-  console.log('slideViewr __constructor');
   super(props);
+  const geometryTypeOptions = [
+    'point',
+    'circle',
+    'box',
+    'polygon',
+    'line',
+    'freehandpolygon',
+    'freehandline'
+  ]
+
+  props.annotations.forEach((annotation) => {
+    const finding = new dcmjs.sr.coding.CodedConcept(annotation.finding)
+    // console.log(finding,'finding...');
+    this.findingOptions.push(finding)
+    const key = _buildKey(finding)
+    if (annotation.geometryTypes !== undefined) {
+      this.geometryTypeOptions[key] = annotation.geometryTypes
+    } else {
+      this.geometryTypeOptions[key] = geometryTypeOptions
+    }
+    this.evaluationOptions[key] = []
+    if (annotation.evaluations !== undefined) {
+      annotation.evaluations.forEach(evaluation => {
+        this.evaluationOptions[key].push({
+          name: new dcmjs.sr.coding.CodedConcept(evaluation.name),
+          values: evaluation.values.map(value => {
+            return new dcmjs.sr.coding.CodedConcept(value)
+          })
+        })
+      })
+    }
+    if (annotation.measurements !== undefined) {
+      annotation.measurements.forEach(measurement => {
+        this.measurements.push({
+          name: new dcmjs.sr.coding.CodedConcept(measurement.name),
+          value: undefined,
+          unit: new dcmjs.sr.coding.CodedConcept(measurement.unit)
+        })
+      })
+    }
+    console.log(this.measurements,'measurements');
+    if (annotation.style != null) {
+      this.roiStyles[key] = _formatRoiStyle(annotation.style)
+    } else {
+      this.roiStyles[key] = this.defaultRoiStyle
+    }
+  })
+
+  this.handleRoiDrawing = this.handleRoiDrawing.bind(this);
+  this.handleAnnotationEvaluationSelection = this.handleAnnotationEvaluationSelection.bind(this);
+  this.handleAnnotationMeasurementActivation = this.handleAnnotationMeasurementActivation.bind(this);
+
   const { volumeViewer, labelViewer } = _constructViewers({
     clients: this.props.clients,
     slide: this.props.slide,
@@ -73,6 +185,8 @@ constructor(props) {
   this.state = {
     presentationStates: [],
     isLoading: false,
+    selectedFinding: undefined,
+    selectedEvaluations: [],
     visibleRoiUIDs: new Set(),
     visibleSegmentUIDs: new Set(),
     visibleMappingUIDs: new Set(),
@@ -82,6 +196,15 @@ constructor(props) {
     loadingFrames: new Set(),
     validXCoordinateRange: [offset[0], offset[0] + size[0]],
     validYCoordinateRange: [offset[1], offset[1] + size[1]],
+    hasComponentDidUpdateLoaded: false,
+    isAnnotationModalVisible: false,
+    isSelectedRoiModalVisible: false,
+    isRoiTranslationActive: false,
+    isRoiDrawingActive: false,
+    isRoiModificationActive: false,
+    isGoToModalVisible: false,
+    selectedGeometryType: undefined,
+    selectedMarkup: undefined
   };
 
 }
@@ -91,6 +214,7 @@ constructor(props) {
     const client = this.props.clients[
       StorageClasses.ADVANCED_BLENDING_PRESENTATION_STATE
     ];
+
     client.searchForInstances({
       studyInstanceUID: this.props.studyInstanceUID,
       queryParams: {
@@ -366,11 +490,11 @@ constructor(props) {
       presentationStates: [],
     });
 
-    console.log(this.volumeViewportRef.current, 'this.volumeViewportRef.current');
-
     if (this.volumeViewportRef.current != null) {
       this.volumeViewer.render({ container: this.volumeViewportRef.current });
     }
+
+    console.log(this.volumeViewportRef.current, 'this.volumeViewportRef.current');
     if (
       this.labelViewportRef.current != null &&
       this.labelViewer != null
@@ -382,19 +506,28 @@ constructor(props) {
   }
 
 
+  componentDidUnmount(){
+    console.log('component will unmount');
+    // window.onbeforeunload = null;
+  }
+
   componentDidUpdate (
     previousProps,
     previousState
   ) {
     console.log(previousState,previousProps,'previousProps,previousState');
-    console.log(this.props.location.pathname);
+    console.log(this.props.history, 'this.props.history');
+    const params = new URLSearchParams(window.location.search)
+    console.log(params.has('reload'),'hasreload');
     if (
       this.props.location.pathname !== previousProps.location.pathname ||
       this.props.studyInstanceUID !== previousProps.studyInstanceUID ||
       this.props.seriesInstanceUID !== previousProps.seriesInstanceUID ||
       this.props.slide !== previousProps.slide ||
       this.props.clients !== previousProps.clients
+       || !this.state.hasComponentDidUpdateLoaded
     ) {
+      console.log('you are at componentDidUpdate');
       if (this.volumeViewportRef.current != null) {
         this.volumeViewportRef.current.innerHTML = ''
       }
@@ -410,8 +543,8 @@ constructor(props) {
         slide: this.props.slide,
         preload: this.props.preload
       })
-      this.volumeViewer = volumeViewer
-      this.labelViewer = labelViewer
+      this.volumeViewer = volumeViewer;
+      this.labelViewer = labelViewer;
 
       const activeOpticalPathIdentifiers = new Set()
       const visibleOpticalPathIdentifiers = new Set()
@@ -438,9 +571,13 @@ constructor(props) {
         presentationStates: [],
         loadingFrames: new Set(),
         validXCoordinateRange: [offset[0], offset[0] + size[0]],
-        validYCoordinateRange: [offset[1], offset[1] + size[1]]
+        validYCoordinateRange: [offset[1], offset[1] + size[1]],
+        hasComponentDidUpdateLoaded: false
       })
-      this.populateViewports()
+      this.populateViewports();
+      this.setState({ hasComponentDidUpdateLoaded: true });
+      // const pathname = this.props.history.location.pathname+'?reload=true';
+      // this.props.history.push(pathname,{replace:true});      
     }
   }
 
@@ -469,8 +606,109 @@ constructor(props) {
         console.log('No ICC Profile was found for color images')
       }
     }
-  
   }
+
+    /**
+   * Handler that will toggle the ROI drawing tool, i.e., either activate or
+   * de-activate it, depending on its current state.
+   */
+     handleRoiDrawing () {
+      if (this.state.isRoiDrawingActive) {
+        console.info('deactivate drawing of ROIs')
+        this.volumeViewer.deactivateDrawInteraction()
+        this.volumeViewer.activateSelectInteraction({})
+        this.setState({
+          isAnnotationModalVisible: false,
+          isSelectedRoiModalVisible: false,
+          isRoiTranslationActive: false,
+          isRoiDrawingActive: false,
+          isRoiModificationActive: false,
+          isGoToModalVisible: false
+        })
+      } else {
+        console.info('activate drawing of ROIs')
+        this.setState({
+          isAnnotationModalVisible: true,
+          isSelectedRoiModalVisible: false,
+          isRoiDrawingActive: true,
+          isRoiModificationActive: false,
+          isRoiTranslationActive: false,
+          isGoToModalVisible: false
+        })
+        this.volumeViewer.deactivateSelectInteraction()
+        this.volumeViewer.deactivateSnapInteraction()
+        this.volumeViewer.deactivateTranslateInteraction()
+        this.volumeViewer.deactivateModifyInteraction()
+      }
+    }
+
+    handleAnnotationEvaluationSelection (
+      value,
+      option
+    ) {
+      const selectedFinding = this.state.selectedFinding
+      if (selectedFinding !== undefined) {
+        const key = _buildKey(selectedFinding)
+        const name = option.label
+        this.evaluationOptions[key].forEach(evaluation => {
+          if (
+            evaluation.name.CodeValue === name.CodeValue &&
+            evaluation.name.CodingSchemeDesignator === name.CodingSchemeDesignator
+          ) {
+            evaluation.values.forEach(code => {
+              if (code.CodeValue === value) {
+                const filteredEvaluations = this.state.selectedEvaluations.filter((item) => item.name !== evaluation.name)
+                console.log(filteredEvaluations,'filteredEvaluations');
+                this.setState({
+                  selectedEvaluations: [
+                    ...filteredEvaluations,
+                    { name: name, value: code }
+                  ]
+                })
+              }
+            })
+          }
+        })
+      }
+    }
+
+    handleAnnotationConfigurationCancellation () {
+      console.debug('cancel annotation configuration')
+      this.setState({
+        isAnnotationModalVisible: false,
+        isRoiDrawingActive: false
+      })
+    }
+
+      /**
+   * Handler that gets called when annotation configuration has been completed.
+   */
+  handleAnnotationConfigurationCompletion () {
+    console.debug('complete annotation configuration')
+    const finding = this.state.selectedFinding
+    const geometryType = this.state.selectedGeometryType
+    const markup = this.state.selectedMarkup
+    if (geometryType !== undefined && finding !== undefined) {
+      this.volumeViewer.activateDrawInteraction({ geometryType, markup })
+      this.setState({
+        isAnnotationModalVisible: false,
+        isRoiDrawingActive: true
+      })
+    } else {
+      console.error('could not complete annotation configuration')
+    }
+  }
+  
+
+  handleAnnotationMeasurementActivation (event) {
+    const active = event.target.checked
+    if (active) {
+      this.setState({ selectedMarkup: 'measurement' })
+    } else {
+      this.setState({ selectedMarkup: undefined })
+    }
+  }
+
 
   render() {
     const toolbarHeight = '0px';
@@ -479,6 +717,123 @@ constructor(props) {
     if (this.state.isLoading) {
       cursor = 'progress';
     }
+
+    const geometryTypeOptionsMapping = {
+      point: <option key='point' value='point'>Point</option>,
+      circle: <option key='circle' value='circle'>Circle</option>,
+      box: <option key='box' value='box'>Box</option>,
+      polygon: <option key='polygon' value='polygon'>Polygon</option>,
+      line: <option key='line' value='line'>Line</option>,
+      freehandpolygon: (
+        <option key='freehandpolygon' value='freehandpolygon'>
+          Polygon (freehand)
+        </option>
+      ),
+      freehandline: (
+        <option key='freehandline' value='freehandline'>
+          Line (freehand)
+        </option>
+      )
+    }
+
+    const annotationConfigurations = [
+      (
+        <select onChange={(e)=>{
+          this.findingOptions.forEach(finding => {
+            if (finding.CodeValue === e.target.value) {
+              console.info(`selected finding "${finding.CodeMeaning}"`)
+              this.setState({
+                selectedFinding: finding,
+                selectedEvaluations: []
+              })
+            }
+          })
+
+        }} key='annotation-finding'>
+          {this.findingOptions.map(finding => {
+            return <option
+              key={finding.CodeValue}
+              value={finding.CodeValue}>
+                {finding.CodeMeaning}
+              </option>
+            })
+          }
+        </select>
+      )
+    ]
+    
+    const selectedFinding = this.state.selectedFinding
+    console.log(selectedFinding,'selectedFind');
+
+    if (selectedFinding !== undefined) {
+      const key = _buildKey(selectedFinding)
+      console.log(this.evaluationOptions[key],'this.evaluationOptions[key]');
+      this.evaluationOptions[key].forEach(evaluation => {
+        const evaluationOptions = evaluation.values.map(code => {
+          return (
+            <option
+              key={code.CodeValue}
+              value={code.CodeValue}
+              label={evaluation.name}
+            >
+              {code.CodeMeaning}
+            </option>
+          )
+        })
+
+        annotationConfigurations.push(
+          <>
+            {evaluation.name.CodeMeaning}
+            <select
+              style={{ minWidth: 130 }}
+              onChange={(e)=>{
+                console.log(e);
+                // this.handleAnnotationEvaluationSelection
+              }}
+              // allowClear
+              // onClear={this.handleAnnotationEvaluationClearance}
+              // defaultActiveFirstOption={false}
+            >
+              {evaluationOptions}
+            </select>
+          </>
+        )
+      })
+      const geometryTypeOptions = this.geometryTypeOptions[key].map(name => {
+        return geometryTypeOptionsMapping[name]
+      })
+
+      annotationConfigurations.push(
+        <>
+          ROI geometry type
+          <select
+            style={{ minWidth: 130 }}
+            onChange={(e) => {
+              // console.log(e.target.value);
+              this.setState({ selectedGeometryType: e.target.value })
+              // this.handleAnnotationGeometryTypeSelection()
+            }}
+            key='annotation-geometry-type'
+          >
+            {geometryTypeOptions}
+          </select>
+        </>
+      )
+      annotationConfigurations.push(
+        <>
+        <input type="checkbox"
+          onChange={this.handleAnnotationMeasurementActivation}
+          key='annotation-measurement'
+          value={'measure'}
+        />
+         Measure
+        </>
+          
+        
+      )
+      
+    }
+
 
     console.log('render function slide viewer');
     return (
@@ -492,6 +847,16 @@ constructor(props) {
             }}
             ref={this.volumeViewportRef}
           />
+          <button onClick={this.handleRoiDrawing}>Create ROI (Polygon)</button>
+          {this.state.isAnnotationModalVisible && <div className="configure_annotations">
+            {annotationConfigurations}
+            <button onClick={()=>{
+              this.handleAnnotationConfigurationCompletion();
+            }}>Start</button>
+            <button onClick={()=>{
+              this.handleAnnotationConfigurationCancellation();
+            }}>Cancel</button>
+          </div>}
         </div>
       // </section>
     );

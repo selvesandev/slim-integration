@@ -91,6 +91,7 @@ class Slide {
       const labelImages = [];
       const overviewImages = [];
       options.images.forEach((image) => {
+        console.log(image,'print for OpticalPathSequence');
         containerIdentifiers.add(image.ContainerIdentifier);
         seriesInstanceUIDs.add(image.SeriesInstanceUID);
         options.images[0].OpticalPathSequence.forEach((item) => {
@@ -227,6 +228,7 @@ export const createSlides = (
   images,
 ) => {
   const slideMetadata = [];
+  console.log(images,'imagesimages')
   images.forEach((series) => {
     if (series.length > 0) {
       const volumeImages = series.filter((image) => (
@@ -272,7 +274,7 @@ export const createSlides = (
       }
     }
   });
-
+console.log(slideMetadata,'slideMetadataslideMetadata');
   let slides = slideMetadata.map((item) => new Slide({
     images: [
       ...item.volumeImages,
@@ -280,6 +282,7 @@ export const createSlides = (
       ...item.overviewImages,
     ],
   }));
+  console.log(slides, 'slidesslides');
   slides = slides.sort((a, b) => {
     const imgA = a.volumeImages[0];
     const imgB = b.volumeImages[0];

@@ -16,6 +16,7 @@ import { createSlides, StorageClasses } from './dicomService';
 const ParametrizedSlideViewer = ({
   clients,
   slides,
+  annotations
 }) => {
   const { studyInstanceUID, seriesInstanceUID } = useParams();
   const location = useLocation();
@@ -34,6 +35,7 @@ const ParametrizedSlideViewer = ({
   if (selectedSlide != null) {
     viewer = (
       <SlideViewer
+        annotations={annotations}
         clients={clients}
         studyInstanceUID={studyInstanceUID}
         seriesInstanceUID={seriesInstanceUID}
@@ -61,6 +63,14 @@ class Viewer extends React.Component {
     this.fetchImageMetadata()
     .then((metadata) => {
         console.log(metadata, 'fetchImageMetadata');
+        // metadata = metadata.map(item=>{
+        //   console.log(item,'itemitem')
+        //   return item.map((innerItem)=>{
+        //     console.log(innerItem['Symbol(bulkdataReferences)'],'Symbol(bulkdataReferences)');
+        //     console.log(innerItem['Symbol(metadata)'],'Symbol(metadata)');  
+        //     return innerItem;
+        //   })
+        // })
         const slides = createSlides(metadata);
         console.log('createSlides', slides);
 
@@ -172,10 +182,11 @@ class Viewer extends React.Component {
             path="/study/:studyInstanceUID/series/:seriesInstanceUID"
             render={
                 () => (
-                  <ParametrizedSlideViewer
-                    clients={this.props.clients}
-                    slides={this.state.slides}
-                  />
+                    <ParametrizedSlideViewer
+                      annotations={this.props.annotations}
+                      clients={this.props.clients}
+                      slides={this.state.slides}
+                    />
                 )
             }
           />
